@@ -25,7 +25,6 @@ from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import ComposableNodeContainer
 from launch_ros.actions import LoadComposableNodes
 from launch_ros.descriptions import ComposableNode
-from launch_ros.parameter_descriptions import ParameterFile
 import yaml
 
 
@@ -85,21 +84,7 @@ def launch_setup(context, *args, **kwargs):
         sensor_calib_fp
     ), "Sensor calib file under calibration/ was not found: {}".format(sensor_calib_fp)
 
-    # Pointcloud preprocessor parameters
-    distortion_corrector_node_param = ParameterFile(
-        param_file=LaunchConfiguration("distortion_correction_node_param_path").perform(context),
-        allow_substs=True,
-    )
-
     nodes = []
-
-    nodes.append(
-        ComposableNode(
-            package="glog_component",
-            plugin="GlogComponent",
-            name="glog_component",
-        )
-    )
 
     nodes.append(
         ComposableNode(
@@ -126,9 +111,8 @@ def launch_setup(context, *args, **kwargs):
                 },
             ],
             remappings=[
-                # cSpell:ignore knzo25
-                # TODO(knzo25): fix the remapping once nebula gets updated
-                ("velodyne_points", "pointcloud_raw_ex"),
+                ("aw_points", "pointcloud_raw"),
+                ("aw_points_ex", "pointcloud_raw_ex"),
             ],
             extra_arguments=[{"use_intra_process_comms": LaunchConfiguration("use_intra_process")}],
         )
@@ -147,8 +131,8 @@ def launch_setup(context, *args, **kwargs):
 
     nodes.append(
         ComposableNode(
-            package="autoware_pointcloud_preprocessor",
-            plugin="autoware::pointcloud_preprocessor::CropBoxFilterComponent",
+            package="pointcloud_preprocessor",
+            plugin="pointcloud_preprocessor::CropBoxFilterComponent",
             name="crop_box_filter_self",
             remappings=[
                 ("input", "pointcloud_raw_ex"),
@@ -169,8 +153,8 @@ def launch_setup(context, *args, **kwargs):
 
     nodes.append(
         ComposableNode(
-            package="autoware_pointcloud_preprocessor",
-            plugin="autoware::pointcloud_preprocessor::CropBoxFilterComponent",
+            package="pointcloud_preprocessor",
+            plugin="pointcloud_preprocessor::CropBoxFilterComponent",
             name="crop_box_filter_mirror",
             remappings=[
                 ("input", "self_cropped/pointcloud_ex"),
@@ -183,8 +167,8 @@ def launch_setup(context, *args, **kwargs):
 
     nodes.append(
         ComposableNode(
-            package="autoware_pointcloud_preprocessor",
-            plugin="autoware::pointcloud_preprocessor::DistortionCorrectorComponent",
+            package="pointcloud_preprocessor",
+            plugin="pointcloud_preprocessor::DistortionCorrectorComponent",
             name="distortion_corrector_node",
             remappings=[
                 ("~/input/twist", "/sensing/vehicle_velocity_converter/twist_with_covariance"),
@@ -192,28 +176,19 @@ def launch_setup(context, *args, **kwargs):
                 ("~/input/pointcloud", "mirror_cropped/pointcloud_ex"),
                 ("~/output/pointcloud", "rectified/pointcloud_ex"),
             ],
-            parameters=[distortion_corrector_node_param],
             extra_arguments=[{"use_intra_process_comms": LaunchConfiguration("use_intra_process")}],
         )
     )
 
-    # Ring Outlier Filter is the last component in the pipeline, so control the output frame here
-    if LaunchConfiguration("output_as_sensor_frame").perform(context).lower() == "true":
-        ring_outlier_filter_parameters = {"output_frame": LaunchConfiguration("frame_id")}
-    else:
-        ring_outlier_filter_parameters = {
-            "output_frame": ""
-        }  # keep the output frame as the input frame
     nodes.append(
         ComposableNode(
-            package="autoware_pointcloud_preprocessor",
-            plugin="autoware::pointcloud_preprocessor::RingOutlierFilterComponent",
+            package="pointcloud_preprocessor",
+            plugin="pointcloud_preprocessor::RingOutlierFilterComponent",
             name="ring_outlier_filter",
             remappings=[
                 ("input", "rectified/pointcloud_ex"),
-                ("output", "pointcloud_before_sync"),
+                ("output", "outlier_filtered/pointcloud"),
             ],
-            parameters=[ring_outlier_filter_parameters],
             extra_arguments=[{"use_intra_process_comms": LaunchConfiguration("use_intra_process")}],
         )
     )
@@ -225,7 +200,14 @@ def launch_setup(context, *args, **kwargs):
         package="rclcpp_components",
         executable=LaunchConfiguration("container_executable"),
         composable_node_descriptions=nodes,
-        output="both",
+        condition=UnlessCondition(LaunchConfiguration("use_pointcloud_container")),
+        output="screen",
+    )
+
+    component_loader = LoadComposableNodes(
+        composable_node_descriptions=nodes,
+        target_container=LaunchConfiguration("container_name"),
+        condition=IfCondition(LaunchConfiguration("use_pointcloud_container")),
     )
 
     driver_component = ComposableNode(
@@ -251,18 +233,27 @@ def launch_setup(context, *args, **kwargs):
                     "packet_mtu_size",
                     "dual_return_distance_threshold",
                     "setup_sensor",
+                    "ptp_profile",
+                    "ptp_domain",
+                    "ptp_transport_type",
                 ),
             }
         ],
     )
 
+    target_container = (
+        container
+        if UnlessCondition(LaunchConfiguration("use_pointcloud_container")).evaluate(context)
+        else LaunchConfiguration("container_name")
+    )
+
     driver_component_loader = LoadComposableNodes(
         composable_node_descriptions=[driver_component],
-        target_container=container,
+        target_container=target_container,
         condition=IfCondition(LaunchConfiguration("launch_driver")),
     )
 
-    return [container, driver_component_loader]
+    return [container, component_loader, driver_component_loader]
 
 
 def generate_launch_description():
@@ -273,8 +264,6 @@ def generate_launch_description():
         launch_arguments.append(
             DeclareLaunchArgument(name, default_value=default_value, description=description)
         )
-
-    common_sensor_share_dir = get_package_share_directory("common_sensor_launch")
 
     add_launch_arg("sensor_model", description="sensor model name")
     add_launch_arg("config_file", "", description="sensor configuration file")
@@ -296,22 +285,16 @@ def generate_launch_description():
     add_launch_arg("frame_id", "lidar", "frame id")
     add_launch_arg("input_frame", LaunchConfiguration("base_frame"), "use for cropbox")
     add_launch_arg("output_frame", LaunchConfiguration("base_frame"), "use for cropbox")
-    add_launch_arg("use_multithread", "False", "use multithread")
-    add_launch_arg("use_intra_process", "False", "use ROS 2 component container communication")
-    add_launch_arg("lidar_container_name", "nebula_node_container")
-    add_launch_arg("output_as_sensor_frame", "True", "output final pointcloud in sensor frame")
     add_launch_arg(
         "vehicle_mirror_param_file", description="path to the file of vehicle mirror position yaml"
     )
-    add_launch_arg(
-        "distortion_correction_node_param_path",
-        os.path.join(
-            common_sensor_share_dir,
-            "config",
-            "distortion_corrector_node.param.yaml",
-        ),
-        description="path to parameter file of distortion correction node",
-    )
+    add_launch_arg("use_multithread", "False", "use multithread")
+    add_launch_arg("use_intra_process", "False", "use ROS 2 component container communication")
+    add_launch_arg("use_pointcloud_container", "false")
+    add_launch_arg("container_name", "nebula_node_container")
+    add_launch_arg("ptp_profile", "1588v2")
+    add_launch_arg("ptp_domain", "0")
+    add_launch_arg("ptp_transport_type", "UDP")
 
     set_container_executable = SetLaunchConfiguration(
         "container_executable",
