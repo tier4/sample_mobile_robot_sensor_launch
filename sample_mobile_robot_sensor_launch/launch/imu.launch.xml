@@ -1,0 +1,25 @@
+<launch>
+  <arg name="launch_driver" default="true"/>
+  <arg name="interface" default="can1"/>
+  <arg name="receiver_interval_sec" default="0.01"/>
+  <arg name="individual_params_config"/>
+
+  <group>
+    <push-ros-namespace namespace="imu"/>
+
+    <group>
+      <push-ros-namespace namespace="tamagawa"/>
+      <node pkg="tamagawa_imu_driver" name="tag_can_driver" exec="tag_can_driver" if="$(var launch_driver)">
+        <remap from="/can/imu" to="/$(var interface)/from_can_bus"/>
+        <remap from="imu/data_raw" to="imu_raw"/>
+        <param name="imu_frame_id" value="imu_link"/>
+      </node>
+    </group>
+
+    <include file="$(find-pkg-share imu_corrector)/launch/imu_corrector.launch.xml">
+      <arg name="input_topic" value="tamagawa/imu_raw"/>
+      <arg name="output_topic" value="imu_data"/>
+      <arg name="param_file" value="$(var individual_params_config)/imu_corrector.param.yaml"/>
+    </include>
+  </group>
+</launch>

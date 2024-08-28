@@ -1,0 +1,59 @@
+<launch>
+
+  <!-- Params -->
+  <arg name="launch_driver" default="true"/>
+
+  <arg name="model" default="PandarXT32"/>
+  <arg name="sensor_frame" default="pandar"/>
+  <arg name="return_mode" default="Strongest"/>
+  <arg name="sensor_ip" default="192.168.1.201"/>
+  <arg name="host_ip" default="255.255.255.255"/>
+  <arg name="data_port" default="2368"/>
+  <arg name="gnss_port" default="2369"/>
+  <arg name="packet_mtu_size" default="1500" description="Packet MTU size"/>
+  <arg name="rotation_speed" default="600" description="Motor RPM, the sensor's internal spin rate."/>
+  <arg name="scan_phase" default="0.0"/>
+  <arg name="cloud_min_angle" default="0"/>
+  <arg name="cloud_max_angle" default="360"/>
+  <arg name="dual_return_distance_threshold" default="0.1"/>
+  <arg name="vehicle_mirror_param_file"/>
+  <arg name="use_pointcloud_container" default="false"/>
+  <arg name="container_name" default="hesai_node_container"/>
+  <arg name="diag_span" default="1000" description="milliseconds"/>
+
+  <include file="$(find-pkg-share sample_mobile_robot_sensor_launch)/launch/nebula_node_container.launch.py">
+    <arg name="launch_driver" value="$(var launch_driver)"/>
+    <arg name="sensor_model" value="$(var model)"/>
+    <arg name="return_mode" value="$(var return_mode)"/>
+    <arg name="frame_id" value="$(var sensor_frame)"/>
+    <arg name="sensor_ip" value="$(var sensor_ip)"/>
+    <arg name="host_ip" value="$(var host_ip)"/>
+    <arg name="data_port" value="$(var data_port)"/>
+    <arg name="scan_phase" value="$(var scan_phase)"/>
+    <arg name="cloud_min_angle" value="$(var cloud_min_angle)"/>
+    <arg name="cloud_max_angle" value="$(var cloud_max_angle)"/>
+    <arg name="dual_return_distance_threshold" value="$(var dual_return_distance_threshold)"/>
+    <arg name="vehicle_mirror_param_file" value="$(var vehicle_mirror_param_file)"/>
+    <arg name="use_intra_process" value="true"/>
+    <arg name="use_multithread" value="true"/>
+    <arg name="use_pointcloud_container" value="$(var use_pointcloud_container)"/>
+    <arg name="container_name" value="$(var container_name)"/>
+  </include>
+
+  <node pkg="nebula_ros" exec="hesai_hw_monitor_ros_wrapper_node" name="hesai_hw_monitor_$(var sensor_frame)" output="screen">
+    <param name="sensor_model" value="$(var model)"/>
+    <param name="return_mode" value="$(var return_mode)"/>
+    <param name="frame_id" value="$(var sensor_frame)"/>
+    <param name="scan_phase" value="$(var scan_phase)"/>
+    <param name="sensor_ip" value="$(var sensor_ip)"/>
+    <param name="host_ip" value="$(var host_ip)"/>
+    <param name="data_port" value="$(var data_port)"/>
+    <param name="gnss_port" value="$(var gnss_port)"/>
+    <param name="packet_mtu_size" value="$(var packet_mtu_size)"/>
+    <param name="rotation_speed" value="$(var rotation_speed)"/>
+    <param name="cloud_min_angle" value="$(var cloud_min_angle)"/>
+    <param name="cloud_max_angle" value="$(var cloud_max_angle)"/>
+    <param name="diag_span" value="$(var diag_span)"/>
+    <param name="dual_return_distance_threshold" value="$(var dual_return_distance_threshold)"/>
+</node>
+</launch>
