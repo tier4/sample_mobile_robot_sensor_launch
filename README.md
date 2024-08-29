@@ -1,1 +1,1 @@
-# sample_sensor_kit_launch
+# sample_mobile_robot_sensor_launch
