@@ -89,8 +89,8 @@ def launch_setup(context, *args, **kwargs):
     nodes.append(
         ComposableNode(
             package="nebula_ros",
-            plugin=sensor_make + "DriverRosWrapper",
-            name=sensor_make.lower() + "_driver_ros_wrapper_node",
+            plugin=sensor_make + "RosWrapper",
+            name=sensor_make.lower() + "_ros_wrapper_node",
             parameters=[
                 {
                     "calibration_file": sensor_calib_fp,
@@ -131,8 +131,8 @@ def launch_setup(context, *args, **kwargs):
 
     nodes.append(
         ComposableNode(
-            package="pointcloud_preprocessor",
-            plugin="pointcloud_preprocessor::CropBoxFilterComponent",
+            package="autoware_pointcloud_preprocessor",
+            plugin="autoware::pointcloud_preprocessor::CropBoxFilterComponent",
             name="crop_box_filter_self",
             remappings=[
                 ("input", "pointcloud_raw_ex"),
@@ -153,8 +153,8 @@ def launch_setup(context, *args, **kwargs):
 
     nodes.append(
         ComposableNode(
-            package="pointcloud_preprocessor",
-            plugin="pointcloud_preprocessor::CropBoxFilterComponent",
+            package="autoware_pointcloud_preprocessor",
+            plugin="autoware::pointcloud_preprocessor::CropBoxFilterComponent",
             name="crop_box_filter_mirror",
             remappings=[
                 ("input", "self_cropped/pointcloud_ex"),
@@ -167,8 +167,8 @@ def launch_setup(context, *args, **kwargs):
 
     nodes.append(
         ComposableNode(
-            package="pointcloud_preprocessor",
-            plugin="pointcloud_preprocessor::DistortionCorrectorComponent",
+            package="autoware_pointcloud_preprocessor",
+            plugin="autoware::pointcloud_preprocessor::DistortionCorrectorComponent",
             name="distortion_corrector_node",
             remappings=[
                 ("~/input/twist", "/sensing/vehicle_velocity_converter/twist_with_covariance"),
@@ -182,8 +182,8 @@ def launch_setup(context, *args, **kwargs):
 
     nodes.append(
         ComposableNode(
-            package="pointcloud_preprocessor",
-            plugin="pointcloud_preprocessor::RingOutlierFilterComponent",
+            package="autoware_pointcloud_preprocessor",
+            plugin="autoware::pointcloud_preprocessor::RingOutlierFilterComponent",
             name="ring_outlier_filter",
             remappings=[
                 ("input", "rectified/pointcloud_ex"),
@@ -212,9 +212,9 @@ def launch_setup(context, *args, **kwargs):
 
     driver_component = ComposableNode(
         package="nebula_ros",
-        plugin=sensor_make + "HwInterfaceRosWrapper",
+        plugin=sensor_make + "RosWrapper",
         # node is created in a global context, need to avoid name clash
-        name=sensor_make.lower() + "_hw_interface_ros_wrapper_node",
+        name=sensor_make.lower() + "_ros_wrapper_node",
         parameters=[
             {
                 "sensor_model": sensor_model,
