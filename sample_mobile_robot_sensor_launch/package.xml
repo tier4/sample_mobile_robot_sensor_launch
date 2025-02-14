@@ -9,6 +9,7 @@
 
   <buildtool_depend>ament_cmake_auto</buildtool_depend>
 
+  <exec_depend>glog_component</exec_depend>
   <exec_depend>dummy_diag_publisher</exec_depend>
   <exec_depend>autoware_imu_corrector</exec_depend>
   <exec_depend>autoware_pointcloud_preprocessor</exec_depend>

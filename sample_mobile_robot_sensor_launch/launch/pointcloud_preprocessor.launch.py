@@ -35,8 +35,8 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             {
                 "input_topics": [
-                    "top/outlier_filtered/pointcloud",
-                    "front/outlier_filtered/pointcloud",
+                    "top/pointcloud_before_sync",
+                    "front/pointcloud_before_sync",
                 ],
                 "output_frame": LaunchConfiguration("base_frame"),
             }

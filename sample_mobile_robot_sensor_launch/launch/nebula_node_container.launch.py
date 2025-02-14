@@ -25,6 +25,7 @@ from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import ComposableNodeContainer
 from launch_ros.actions import LoadComposableNodes
 from launch_ros.descriptions import ComposableNode
+from launch_ros.parameter_descriptions import ParameterFile
 import yaml
 
 
@@ -33,6 +34,8 @@ def get_lidar_make(sensor_name):
         return "Hesai", ".csv"
     elif sensor_name[:3].lower() in ["hdl", "vlp", "vls"]:
         return "Velodyne", ".yaml"
+    elif sensor_name.lower() in ["helios", "bpearl"]:
+        return "Robosense", None
     return "unrecognized_sensor_model"
 
 
@@ -62,6 +65,10 @@ def get_vehicle_mirror_info(context):
 
 
 def launch_setup(context, *args, **kwargs):
+    def load_composable_node_param(param_path):
+        with open(LaunchConfiguration(param_path).perform(context), "r") as f:
+            return yaml.safe_load(f)["/**"]["ros__parameters"]
+
     def create_parameter_dict(*args):
         result = {}
         for x in args:
@@ -84,7 +91,25 @@ def launch_setup(context, *args, **kwargs):
         sensor_calib_fp
     ), "Sensor calib file under calibration/ was not found: {}".format(sensor_calib_fp)
 
+    # Pointcloud preprocessor parameters
+    distortion_corrector_node_param = ParameterFile(
+        param_file=LaunchConfiguration("distortion_correction_node_param_path").perform(context),
+        allow_substs=True,
+    )
+    ring_outlier_filter_node_param = ParameterFile(
+        param_file=LaunchConfiguration("ring_outlier_filter_node_param_path").perform(context),
+        allow_substs=True,
+    )
+
     nodes = []
+
+    nodes.append(
+        ComposableNode(
+            package="glog_component",
+            plugin="GlogComponent",
+            name="glog_component",
+        )
+    )
 
     nodes.append(
         ComposableNode(
@@ -93,26 +118,39 @@ def launch_setup(context, *args, **kwargs):
             name=sensor_make.lower() + "_ros_wrapper_node",
             parameters=[
                 {
-                    "calibration_file": sensor_calib_fp,
                     "sensor_model": sensor_model,
+                    "calibration_file": sensor_calib_fp,
+                    "launch_hw": LaunchConfiguration("launch_driver"),
                     **create_parameter_dict(
+                        "return_mode",
                         "host_ip",
                         "sensor_ip",
+                        "multicast_ip",
                         "data_port",
-                        "return_mode",
+                        "gnss_port",
+                        "frame_id",
+                        "cut_angle",
+                        "sync_angle",
                         "min_range",
                         "max_range",
-                        "frame_id",
-                        "scan_phase",
+                        "packet_mtu_size",
+                        "rotation_speed",
                         "cloud_min_angle",
                         "cloud_max_angle",
                         "dual_return_distance_threshold",
+                        "ptp_profile",
+                        "ptp_transport_type",
+                        "ptp_switch_type",
+                        "ptp_domain",
+                        "diag_span",
+                        "setup_sensor",
+                        "retry_hw",
                     ),
                 },
             ],
             remappings=[
-                ("aw_points", "pointcloud_raw"),
-                ("aw_points_ex", "pointcloud_raw_ex"),
+                ("pandar_points", "pointcloud_raw_ex"),
+                ("velodyne_points", "pointcloud_raw_ex"),
             ],
             extra_arguments=[{"use_intra_process_comms": LaunchConfiguration("use_intra_process")}],
         )
@@ -176,9 +214,17 @@ def launch_setup(context, *args, **kwargs):
                 ("~/input/pointcloud", "mirror_cropped/pointcloud_ex"),
                 ("~/output/pointcloud", "rectified/pointcloud_ex"),
             ],
+            parameters=[distortion_corrector_node_param],
             extra_arguments=[{"use_intra_process_comms": LaunchConfiguration("use_intra_process")}],
         )
     )
+
+    # Ring Outlier Filter is the last component in the pipeline, so control the output frame here
+    if LaunchConfiguration("output_as_sensor_frame").perform(context).lower() == "true":
+        ring_outlier_output_frame = {"output_frame": LaunchConfiguration("frame_id")}
+    else:
+        # keep the output frame as the input frame
+        ring_outlier_output_frame = {"output_frame": ""}
 
     nodes.append(
         ComposableNode(
@@ -187,8 +233,9 @@ def launch_setup(context, *args, **kwargs):
             name="ring_outlier_filter",
             remappings=[
                 ("input", "rectified/pointcloud_ex"),
-                ("output", "outlier_filtered/pointcloud"),
+                ("output", "pointcloud_before_sync"),
             ],
+            parameters=[ring_outlier_filter_node_param, ring_outlier_output_frame],
             extra_arguments=[{"use_intra_process_comms": LaunchConfiguration("use_intra_process")}],
         )
     )
@@ -200,60 +247,41 @@ def launch_setup(context, *args, **kwargs):
         package="rclcpp_components",
         executable=LaunchConfiguration("container_executable"),
         composable_node_descriptions=nodes,
-        condition=UnlessCondition(LaunchConfiguration("use_pointcloud_container")),
-        output="screen",
+        output="both",
     )
 
-    component_loader = LoadComposableNodes(
-        composable_node_descriptions=nodes,
-        target_container=LaunchConfiguration("container_name"),
-        condition=IfCondition(LaunchConfiguration("use_pointcloud_container")),
-    )
-
-    driver_component = ComposableNode(
-        package="nebula_ros",
-        plugin=sensor_make + "RosWrapper",
-        # node is created in a global context, need to avoid name clash
-        name=sensor_make.lower() + "_ros_wrapper_node",
+    blockage_diag_component = ComposableNode(
+        package="autoware_pointcloud_preprocessor",
+        plugin="autoware::pointcloud_preprocessor::BlockageDiagComponent",
+        name="blockage_diag",
+        remappings=[
+            ("input", "pointcloud_raw_ex"),
+            ("output", "blockage_diag/pointcloud"),
+        ],
         parameters=[
             {
-                "sensor_model": sensor_model,
-                "calibration_file": sensor_calib_fp,
-                **create_parameter_dict(
-                    "sensor_ip",
-                    "host_ip",
-                    "scan_phase",
-                    "return_mode",
-                    "frame_id",
-                    "rotation_speed",
-                    "data_port",
-                    "gnss_port",
-                    "cloud_min_angle",
-                    "cloud_max_angle",
-                    "packet_mtu_size",
-                    "dual_return_distance_threshold",
-                    "setup_sensor",
-                    "ptp_profile",
-                    "ptp_domain",
-                    "ptp_transport_type",
-                ),
+                "angle_range": [
+                    float(context.perform_substitution(LaunchConfiguration("cloud_min_angle"))),
+                    float(context.perform_substitution(LaunchConfiguration("cloud_max_angle"))),
+                ],
+                "horizontal_ring_id": LaunchConfiguration("horizontal_ring_id"),
+                "vertical_bins": LaunchConfiguration("vertical_bins"),
+                "is_channel_order_top2down": LaunchConfiguration("is_channel_order_top2down"),
+                "max_distance_range": LaunchConfiguration("max_range"),
+                "horizontal_resolution": LaunchConfiguration("horizontal_resolution"),
             }
-        ],
+        ]
+        + [load_composable_node_param("blockage_diagnostics_param_file")],
+        extra_arguments=[{"use_intra_process_comms": LaunchConfiguration("use_intra_process")}],
     )
 
-    target_container = (
-        container
-        if UnlessCondition(LaunchConfiguration("use_pointcloud_container")).evaluate(context)
-        else LaunchConfiguration("container_name")
+    blockage_diag_loader = LoadComposableNodes(
+        composable_node_descriptions=[blockage_diag_component],
+        target_container=container,
+        condition=IfCondition(LaunchConfiguration("enable_blockage_diag")),
     )
 
-    driver_component_loader = LoadComposableNodes(
-        composable_node_descriptions=[driver_component],
-        target_container=target_container,
-        condition=IfCondition(LaunchConfiguration("launch_driver")),
-    )
-
-    return [container, component_loader, driver_component_loader]
+    return [container, blockage_diag_loader]
 
 
 def generate_launch_description():
@@ -265,36 +293,77 @@ def generate_launch_description():
             DeclareLaunchArgument(name, default_value=default_value, description=description)
         )
 
+    common_sensor_share_dir = get_package_share_directory("common_sensor_launch")
+
     add_launch_arg("sensor_model", description="sensor model name")
-    add_launch_arg("config_file", "", description="sensor configuration file")
     add_launch_arg("launch_driver", "True", "do launch driver")
-    add_launch_arg("setup_sensor", "True", "configure sensor")
-    add_launch_arg("sensor_ip", "192.168.1.201", "device ip address")
+    add_launch_arg("return_mode", "Strongest")
     add_launch_arg("host_ip", "255.255.255.255", "host ip address")
-    add_launch_arg("scan_phase", "0.0")
-    add_launch_arg("base_frame", "base_link", "base frame id")
-    add_launch_arg("min_range", "0.3", "minimum view range for Velodyne sensors")
-    add_launch_arg("max_range", "300.0", "maximum view range for Velodyne sensors")
-    add_launch_arg("cloud_min_angle", "0", "minimum view angle setting on device")
-    add_launch_arg("cloud_max_angle", "360", "maximum view angle setting on device")
+    add_launch_arg("sensor_ip", "192.168.1.201", "device ip address")
+    add_launch_arg("multicast_ip", "")
     add_launch_arg("data_port", "2368", "device data port number")
     add_launch_arg("gnss_port", "2380", "device gnss port number")
+    add_launch_arg("frame_id", "lidar", "frame id")
+    add_launch_arg("cut_angle", "0.0")
+    add_launch_arg("sync_angle", "0.0")
+    add_launch_arg("min_range", "0.3", "minimum view range for Velodyne sensors")
+    add_launch_arg("max_range", "300.0", "maximum view range for Velodyne sensors")
     add_launch_arg("packet_mtu_size", "1500", "packet mtu size")
     add_launch_arg("rotation_speed", "600", "rotational frequency")
+    add_launch_arg("cloud_min_angle", "0", "minimum view angle setting on device")
+    add_launch_arg("cloud_max_angle", "360", "maximum view angle setting on device")
     add_launch_arg("dual_return_distance_threshold", "0.1", "dual return distance threshold")
-    add_launch_arg("frame_id", "lidar", "frame id")
+    add_launch_arg("ptp_profile", "1588v2")
+    add_launch_arg("ptp_transport_type", "UDP")
+    add_launch_arg("ptp_switch_type", "TSN")
+    add_launch_arg("ptp_domain", "0")
+    add_launch_arg("diag_span", "1000")
+    add_launch_arg("setup_sensor", "true")
+    add_launch_arg("retry_hw", "true")    
+    add_launch_arg("output_as_sensor_frame", "True", "output final pointcloud in sensor frame")
+    add_launch_arg("enable_blockage_diag", "false")
+    add_launch_arg("horizontal_ring_id", "64")
+    add_launch_arg("vertical_bins", "128")
+    add_launch_arg("is_channel_order_top2down", "true")
+    add_launch_arg("horizontal_resolution", "0.4")
+    add_launch_arg("base_frame", "base_link", "base frame id")
     add_launch_arg("input_frame", LaunchConfiguration("base_frame"), "use for cropbox")
     add_launch_arg("output_frame", LaunchConfiguration("base_frame"), "use for cropbox")
-    add_launch_arg(
-        "vehicle_mirror_param_file", description="path to the file of vehicle mirror position yaml"
-    )
     add_launch_arg("use_multithread", "False", "use multithread")
     add_launch_arg("use_intra_process", "False", "use ROS 2 component container communication")
     add_launch_arg("use_pointcloud_container", "false")
     add_launch_arg("container_name", "nebula_node_container")
-    add_launch_arg("ptp_profile", "1588v2")
-    add_launch_arg("ptp_domain", "0")
-    add_launch_arg("ptp_transport_type", "UDP")
+    add_launch_arg(
+        "blockage_diagnostics_param_file",
+        os.path.join(
+            common_sensor_share_dir,
+            "config",
+            "blockage_diagnostics.param.yaml",
+        ),
+        description="path to parameter file of blockage diagnostics node",
+    )
+    add_launch_arg(
+        "vehicle_mirror_param_file",
+        description="path to the file of vehicle mirror position yaml",
+    )
+    add_launch_arg(
+        "distortion_correction_node_param_path",
+        os.path.join(
+            common_sensor_share_dir,
+            "config",
+            "distortion_corrector_node.param.yaml",
+        ),
+        description="path to parameter file of distortion correction node",
+    )
+    add_launch_arg(
+        "ring_outlier_filter_node_param_path",
+        os.path.join(
+            common_sensor_share_dir,
+            "config",
+            "ring_outlier_filter_node.param.yaml",
+        ),
+        description="path to parameter file of ring outlier filter node",
+    )
 
     set_container_executable = SetLaunchConfiguration(
         "container_executable",

@@ -14,7 +14,7 @@
         <arg name="sensor_ip" value="192.168.2.201"/>
         <arg name="host_ip" value="192.168.2.100"/>
         <arg name="data_port" value="2369"/>
-        <arg name="scan_phase" value="0.0" />
+        <arg name="cut_angle" value="180.0" />
         <arg name="cloud_min_angle" value="0"/>
         <arg name="cloud_max_angle" value="360"/>
         <arg name="dual_return_distance_threshold" value="0.1"/>
@@ -31,7 +31,7 @@
         <arg name="sensor_ip" value="192.168.1.201"/>
         <arg name="host_ip" value="192.168.1.100"/>
         <arg name="data_port" value="2368"/>
-        <arg name="scan_phase" value="0.0" />
+        <arg name="cut_angle" value="180.0" />
         <arg name="cloud_min_angle" value="95"/>
         <arg name="cloud_max_angle" value="265"/>
         <arg name="dual_return_distance_threshold" value="0.1"/>

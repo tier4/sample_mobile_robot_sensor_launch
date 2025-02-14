@@ -10,7 +10,7 @@
   <arg name="multicast_ip" default=""/>
   <arg name="host_ip" default="192.168.1.100"/>
   <arg name="data_port" default="2368"/>
-  <arg name="gnss_port" default="2369"/>
+  <arg name="gnss_port" default="2380"/>
   <arg name="packet_mtu_size" default="1500" description="Packet MTU size"/>
   <arg name="rotation_speed" default="600" description="Motor RPM, the sensor's internal spin rate."/>
   <arg name="scan_phase" default="0.0"/>
@@ -18,7 +18,7 @@
   <arg name="cloud_max_angle" default="360.0"/>
   <arg name="min_range" default="0.3"/>
   <arg name="max_range" default="300.0"/>
-  <arg name="cut_angle" default="40.0"/>
+  <arg name="cut_angle" default="0.0"/>
   <arg name="sync_angle" default="0"/>
   <arg name="dual_return_distance_threshold" default="0.1"/>
   <arg name="vehicle_mirror_param_file"/>
@@ -44,6 +44,9 @@
     <arg name="multicast_ip" value="$(var multicast_ip)"/>
     <arg name="host_ip" value="$(var host_ip)"/>
     <arg name="data_port" value="$(var data_port)"/>
+    <arg name="gnss_port" value="$(var gnss_port)"/>
+    <arg name="packet_mtu_size" value="$(var packet_mtu_size)"/>
+    <arg name="rotation_speed" value="$(var rotation_speed)"/>
     <arg name="scan_phase" value="$(var scan_phase)"/>
     <arg name="cloud_min_angle" value="$(var cloud_min_angle)"/>
     <arg name="cloud_max_angle" value="$(var cloud_max_angle)"/>
@@ -67,35 +70,4 @@
     <arg name="setup_sensor" value="$(var setup_sensor)"/>
     <arg name="retry_hw" value="$(var retry_hw)"/>
   </include>
-
-  <node pkg="nebula_ros" exec="hesai_ros_wrapper_node" name="hesai_$(var sensor_frame)" output="screen">
-    <param name="sensor_model" value="$(var model)"/>
-    <param name="return_mode" value="$(var return_mode)"/>
-    <param name="frame_id" value="$(var sensor_frame)"/>
-    <param name="scan_phase" value="$(var scan_phase)"/>
-    <param name="sensor_ip" value="$(var sensor_ip)"/>
-    <param name="multicast_ip" value="$(var multicast_ip)"/>
-    <param name="host_ip" value="$(var host_ip)"/>
-    <param name="data_port" value="$(var data_port)"/>
-    <param name="gnss_port" value="$(var gnss_port)"/>
-    <param name="packet_mtu_size" value="$(var packet_mtu_size)"/>
-    <param name="rotation_speed" value="$(var rotation_speed)"/>
-    <param name="cloud_min_angle" value="$(var cloud_min_angle)"/>
-    <param name="cloud_max_angle" value="$(var cloud_max_angle)"/>
-    <param name="min_range" value="$(var min_range)"/>
-    <param name="max_range" value="$(var max_range)"/>
-    <param name="cut_angle" value="$(var cut_angle)"/>
-    <param name="sync_angle" value="$(var sync_angle)"/>
-    <param name="diag_span" value="$(var diag_span)"/>
-    <param name="dual_return_distance_threshold" value="$(var dual_return_distance_threshold)"/>
-    <param name="calibration_file" value="$(var calibration_file)"/>
-    <param name="ptp_profile" value="$(var ptp_profile)"/>
-    <param name="ptp_domain" value="$(var ptp_domain)"/>
-    <param name="ptp_transport_type" value="$(var ptp_transport_type)"/>
-    <param name="ptp_switch_type" value="$(var ptp_switch_type)"/>
-    <param name="ptp_lock_threshold" value="$(var ptp_lock_threshold)"/>
-    <param name="launch_hw" value="$(var launch_hw)"/>
-    <param name="setup_sensor" value="$(var setup_sensor)"/>
-    <param name="retry_hw" value="$(var retry_hw)"/>
-  </node>
 </launch>
