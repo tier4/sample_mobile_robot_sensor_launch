@@ -1,0 +1,50 @@
+units:
+  - path: /autoware/sensing/sample_mobile_robot_sensor
+    type: and
+    list:
+      - {type: link, link: autoware/sensing/lidar/top/connection }
+      - {type: link, link: autoware/sensing/lidar/top/ptp }
+      - {type: link, link: autoware/sensing/lidar/top/temperature }
+      - {type: link, link: autoware/sensing/lidar/front/connection }
+      - {type: link, link: autoware/sensing/lidar/front/ptp }
+      - {type: link, link: autoware/sensing/lidar/front/temperature }
+      - {type: link, link: autoware/sensing/imu/connection }
+
+# top lidar
+  - path: autoware/sensing/lidar/top/connection
+    type: diag
+    node: /sensing/lidar/top/hesai_ros_wrapper_node
+    name: hesai_status
+    timeout: 5.0
+  - path: autoware/sensing/lidar/top/ptp
+    type: diag
+    node: /sensing/lidar/top/hesai_ros_wrapper_node
+    name: hesai_ptp
+    timeout: 5.0
+  - path: autoware/sensing/lidar/top/temperature
+    type: diag
+    node: /sensing/lidar/top/hesai_ros_wrapper_node
+    name: hesai_temperature
+    timeout: 5.0
+# front lidar
+  - path: autoware/sensing/lidar/front/connection
+    type: diag
+    node: /sensing/lidar/front/hesai_ros_wrapper_node
+    name: hesai_status
+    timeout: 5.0
+  - path: autoware/sensing/lidar/front/ptp
+    type: diag
+    node: /sensing/lidar/front/hesai_ros_wrapper_node
+    name: hesai_ptp
+    timeout: 5.0
+  - path: autoware/sensing/lidar/front/temperature
+    type: diag
+    node: /sensing/lidar/front/hesai_ros_wrapper_node
+    name: hesai_temperature
+    timeout: 5.0
+# IMU
+  - path: autoware/sensing/imu/connection
+    type: diag
+    node: topic_state_monitor_imu_data
+    name: imu_topic_status
+    timeout: 1.0
