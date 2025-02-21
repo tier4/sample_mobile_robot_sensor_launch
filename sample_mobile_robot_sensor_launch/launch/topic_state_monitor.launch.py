@@ -18,8 +18,8 @@ from launch_ros.descriptions import ComposableNode
 
 
 def generate_launch_description():
-    # Topic Monitor For LiDAR 
-    topic_state_monitor_lidr_top = ComposableNode(
+    # Topic Monitor For LiDAR
+    topic_state_monitor_lidar_top = ComposableNode(
         package="topic_state_monitor",
         plugin="topic_state_monitor::TopicStateMonitorNode",
         name="topic_state_monitor_lidar_top",
@@ -38,7 +38,7 @@ def generate_launch_description():
         extra_arguments=[{"use_intra_process_comms": True}],
     )
 
-    topic_state_monitor_lidr_front = ComposableNode(
+    topic_state_monitor_lidar_front = ComposableNode(
         package="topic_state_monitor",
         plugin="topic_state_monitor::TopicStateMonitorNode",
         name="topic_state_monitor_lidar_front",
@@ -104,8 +104,8 @@ def generate_launch_description():
         package="rclcpp_components",
         executable="component_container",
         composable_node_descriptions=[
-            topic_state_monitor_lidr_top,
-            topic_state_monitor_lidr_front,
+            topic_state_monitor_lidar_top,
+            topic_state_monitor_lidar_front,
             topic_state_monitor_imu,
             topic_state_monitor_vehicle_voice_alert_system,
         ],
