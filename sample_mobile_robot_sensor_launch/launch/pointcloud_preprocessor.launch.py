@@ -28,15 +28,15 @@ from launch_ros.descriptions import ComposableNode
 def launch_setup(context, *args, **kwargs):
     # # set concat filter as a component
     concat_component = ComposableNode(
-        package="pointcloud_preprocessor",
-        plugin="pointcloud_preprocessor::PointCloudConcatenateDataSynchronizerComponent",
+        package="autoware_pointcloud_preprocessor",
+        plugin="autoware::pointcloud_preprocessor::PointCloudConcatenateDataSynchronizerComponent",
         name="concatenate_data",
         remappings=[("output", "concatenated/pointcloud")],
         parameters=[
             {
                 "input_topics": [
-                    "top/outlier_filtered/pointcloud",
-                    "front/outlier_filtered/pointcloud",
+                    "top/pointcloud_before_sync",
+                    "front/pointcloud_before_sync",
                 ],
                 "output_frame": LaunchConfiguration("base_frame"),
             }
